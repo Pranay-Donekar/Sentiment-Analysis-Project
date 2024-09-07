@@ -1,0 +1,404 @@
+import pandas as pd
+
+# Load the dataset
+file_path = "C:\\Users\\PRANAY\\Downloads\\train_data.csv"
+data = pd.read_csv(file_path)
+
+# Display the first few rows of the dataset
+print(data.head())
+
+# Display basic information about the dataset
+print(data.info())
+
+# Check the distribution of sentiment categories
+print(data['sentiment'].value_counts())
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Visualize the distribution of sentiment categories
+plt.figure(figsize=(10, 6))
+sns.countplot(x='sentiment', data=data)
+plt.title('Distribution of Sentiment Categories')
+plt.xlabel('Sentiment')
+plt.ylabel('Count')
+plt.show()
+
+
+import pandas as pd
+from imblearn.over_sampling import SMOTE
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Load the dataset
+file_path = "C:\\Users\\PRANAY\\Downloads\\train_data.csv"
+data = pd.read_csv(file_path)
+
+# Separate features and labels
+X = data['reviews.text']
+y = data['sentiment']
+
+# Convert text data to numeric using TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(max_features=5000)
+X_tfidf = tfidf_vectorizer.fit_transform(X)
+
+# Apply SMOTE to balance the classes
+smote = SMOTE()
+X_balanced, y_balanced = smote.fit_resample(X_tfidf, y)
+
+# Display the distribution of balanced classes
+print(pd.Series(y_balanced).value_counts())
+
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X_balanced, y_balanced, test_size=0.2, random_state=42)
+
+# Train the Multinomial Naive Bayes model
+nb_model = MultinomialNB()
+nb_model.fit(X_train, y_train)
+
+# Predict and evaluate the model
+y_pred = nb_model.predict(X_test)
+print("Multinomial Naive Bayes Accuracy:", accuracy_score(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+
+from sklearn.metrics import roc_auc_score
+
+# Evaluate the model using precision, recall, F1-score
+print(classification_report(y_test, y_pred))
+
+# For AUC-ROC, we need the probability estimates
+y_proba = nb_model.predict_proba(X_test)
+print("AUC-ROC Score:", roc_auc_score(y_test, y_proba, multi_class='ovr'))
+
+#week 3 & 4
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, accuracy_score
+
+# Initialize SVM classifier
+svm_model = SVC(kernel='linear', C=1.0, random_state=42)
+
+# Train the SVM model
+svm_model.fit(X_train, y_train)
+
+# Predict on test set
+y_pred_svm = svm_model.predict(X_test)
+
+# Evaluate SVM model
+print("Multi-class SVM Accuracy:", accuracy_score(y_test, y_pred_svm))
+print(classification_report(y_test, y_pred_svm))
+
+
+from sklearn.preprocessing import LabelEncoder
+
+# Initialize LabelEncoder
+label_encoder = LabelEncoder()
+
+# Fit label encoder and transform labels
+y_train_encoded = label_encoder.fit_transform(y_train)
+y_test_encoded = label_encoder.transform(y_test)
+
+# Make sure to use the same label encoder instance for consistency
+# label_encoder.classes_ will contain the original class labels
+
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.utils import to_categorical
+
+# Convert integer labels to one-hot encoded labels
+y_train_categorical = to_categorical(y_train_encoded)
+y_test_categorical = to_categorical(y_test_encoded)
+
+# Define the model architecture
+model = Sequential([
+    Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
+    Dropout(0.5),
+    Dense(64, activation='relu'),
+    Dense(len(label_encoder.classes_), activation='softmax')  # Use number of classes instead of hardcoding 3
+])
+
+# Compile the model with categorical_crossentropy
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model with categorical labels
+history = model.fit(X_train.toarray(), y_train_categorical, epochs=20, batch_size=32, validation_split=0.1, callbacks=[EarlyStopping(patience=3)])
+
+# Evaluate the model with categorical labels
+_, accuracy = model.evaluate(X_test.toarray(), y_test_categorical)
+print("Feedforward Neural Network Accuracy:", accuracy)
+
+
+import numpy as np
+
+# Reshape X_train and X_test for LSTM input
+X_train_lstm = np.reshape(X_train.toarray(), (X_train.shape[0], 1, X_train.shape[1]))
+X_test_lstm = np.reshape(X_test.toarray(), (X_test.shape[0], 1, X_test.shape[1]))
+
+
+
+from tensorflow.keras.layers import LSTM
+
+# Define the model architecture with LSTM
+model_lstm = Sequential([
+    LSTM(64, input_shape=(1, X_train.shape[1]), activation='relu', return_sequences=True),
+    Dropout(0.5),
+    LSTM(32, activation='relu'),
+    Dense(32, activation='relu'),
+    Dense(len(label_encoder.classes_), activation='softmax')
+])
+
+# Compile the LSTM model
+model_lstm.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the LSTM model
+history_lstm = model_lstm.fit(X_train_lstm, y_train_categorical, epochs=20, batch_size=32, validation_split=0.1, callbacks=[EarlyStopping(patience=3)])
+
+# Evaluate the LSTM model
+_, accuracy_lstm = model_lstm.evaluate(X_test_lstm, y_test_categorical)
+print("LSTM Model Accuracy:", accuracy_lstm)
+
+
+from imblearn.over_sampling import SMOTE
+from sklearn.preprocessing import LabelEncoder
+from sklearn.naive_bayes import MultinomialNB
+from xgboost import XGBClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
+from sklearn.ensemble import VotingClassifier
+
+# Assume X_train, X_test, y_train, y_test are already defined
+
+# Encode target variable
+encoder = LabelEncoder()
+y_train_encoded = encoder.fit_transform(y_train)
+y_test_encoded = encoder.transform(y_test)
+
+# Oversample using SMOTE
+smote = SMOTE(random_state=42)
+X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train_encoded)
+
+# Initialize models
+nb_model = MultinomialNB()
+xgb_model = XGBClassifier(n_estimators=100, random_state=42)
+
+# Train the models on the resampled data
+nb_model.fit(X_train_resampled, y_train_resampled)
+xgb_model.fit(X_train_resampled, y_train_resampled)
+
+# Predict on the test set
+nb_pred = nb_model.predict(X_test)
+xgb_pred = xgb_model.predict(X_test)
+
+# Evaluate individual model accuracies
+nb_accuracy = accuracy_score(y_test_encoded, nb_pred)
+xgb_accuracy = accuracy_score(y_test_encoded, xgb_pred)
+
+print("Multinomial Naive Bayes Accuracy:", nb_accuracy)
+print("XGBoost Accuracy:", xgb_accuracy)
+
+# Create an ensemble model using VotingClassifier
+voting_clf = VotingClassifier(estimators=[
+    ('nb', nb_model),
+    ('xgb', xgb_model)
+])
+
+voting_clf.fit(X_train_resampled, y_train_resampled)
+ensemble_accuracy = voting_clf.score(X_test, y_test_encoded)
+print("Ensemble Model Accuracy:", ensemble_accuracy)
+
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+import scipy.sparse as sp
+from imblearn.over_sampling import SMOTE
+
+# Load the dataset with the new feature
+data = pd.read_csv(file_path)
+
+# Print the column names to check
+print(data.columns)
+
+# Engineer the 'sentiment_score' as a dummy example
+# Here, you might use a real sentiment analysis or some heuristic to create this score
+data['sentiment_score'] = data['sentiment'].apply(lambda x: 1 if x == 'positive' else 0 if x == 'negative' else 0.5)
+
+# Separate features and labels
+X = data['reviews.text']
+y = data['sentiment']
+sentiment_score = data['sentiment_score']
+
+# Convert text data to numeric using TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(max_features=5000)
+X_tfidf = tfidf_vectorizer.fit_transform(X)
+
+# Ensure sentiment_score is a numeric type and convert to sparse matrix
+sentiment_score_sparse = sp.csr_matrix(sentiment_score.values.reshape(-1, 1).astype(float))
+
+# Combine TF-IDF features with sentiment score
+X_combined = sp.hstack((X_tfidf, sentiment_score_sparse))
+
+# Apply SMOTE to balance the classes
+smote = SMOTE()
+X_balanced, y_balanced = smote.fit_resample(X_combined, y)
+
+
+# Initialize SVM classifier with new features
+svm_model = SVC(kernel='linear', C=1.0, random_state=42)
+
+# Train the SVM model
+svm_model.fit(X_train, y_train)
+
+# Predict on test set
+y_pred_svm = svm_model.predict(X_test)
+
+# Evaluate SVM model
+print("Multi-class SVM Accuracy:", accuracy_score(y_test, y_pred_svm))
+print(classification_report(y_test, y_pred_svm))
+
+
+# Initialize models with new features
+nb_model = MultinomialNB()
+xgb_model = XGBClassifier(n_estimators=100, random_state=42)
+
+# Train the models on the resampled data
+nb_model.fit(X_train_resampled, y_train_resampled)
+xgb_model.fit(X_train_resampled, y_train_resampled)
+
+# Create an ensemble model using VotingClassifier
+voting_clf = VotingClassifier(estimators=[
+    ('nb', nb_model),
+    ('xgb', xgb_model)
+])
+
+voting_clf.fit(X_train_resampled, y_train_resampled)
+ensemble_accuracy = voting_clf.score(X_test, y_test_encoded)
+print("Ensemble Model Accuracy:", ensemble_accuracy)
+
+
+# Engineer the 'sentiment_score' as a dummy example
+data['sentiment_score'] = data['sentiment'].apply(lambda x: 1 if x == 'Positive' else 0 if x == 'Negative' else 0.5)
+
+# Combine TF-IDF features with sentiment score
+sentiment_score_sparse = sp.csr_matrix(data['sentiment_score'].values.reshape(-1, 1).astype(float))
+X_combined = sp.hstack((X_tfidf, sentiment_score_sparse))
+
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+import numpy as np
+
+# Convert integer labels to one-hot encoded labels
+y_train_categorical = to_categorical(y_train_encoded)
+y_test_categorical = to_categorical(y_test_encoded)
+
+# Reshape X_train and X_test for LSTM input
+X_train_lstm = np.reshape(X_train.toarray(), (X_train.shape[0], 1, X_train.shape[1]))
+X_test_lstm = np.reshape(X_test.toarray(), (X_test.shape[0], 1, X_test.shape[1]))
+
+# Define the model architecture with LSTM
+model_lstm = Sequential([
+    LSTM(64, input_shape=(1, X_train.shape[1]), activation='relu', return_sequences=True),
+    Dropout(0.5),
+    LSTM(32, activation='relu'),
+    Dense(32, activation='relu'),
+    Dense(len(label_encoder.classes_), activation='softmax')
+])
+
+# Compile the LSTM model
+model_lstm.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the LSTM model
+history_lstm = model_lstm.fit(X_train_lstm, y_train_categorical, epochs=20, batch_size=32, validation_split=0.1, callbacks=[EarlyStopping(patience=3)])
+
+# Evaluate the LSTM model
+_, accuracy_lstm = model_lstm.evaluate(X_test_lstm, y_test_categorical)
+print("LSTM Model Accuracy:", accuracy_lstm)
+
+
+
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+
+# Example: Grid Search for SVM
+param_grid = {
+    'C': [0.1, 1, 10, 100],
+    'kernel': ['linear', 'rbf']
+}
+
+grid_search = GridSearchCV(SVC(), param_grid, cv=5, scoring='accuracy', verbose=2)
+grid_search.fit(X_train, y_train)
+
+print("Best parameters found by Grid Search:", grid_search.best_params_)
+print("Best accuracy found by Grid Search:", grid_search.best_score_)
+
+# Example: Random Search for XGBoost
+param_dist = {
+    'n_estimators': [50, 100, 150],
+    'learning_rate': [0.01, 0.1, 0.2],
+    'max_depth': [3, 5, 7]
+}
+
+random_search = RandomizedSearchCV(XGBClassifier(), param_distributions=param_dist, n_iter=10, cv=5, scoring='accuracy', random_state=42, verbose=2)
+random_search.fit(X_train, y_train)
+
+print("Best parameters found by Random Search:", random_search.best_params_)
+print("Best accuracy found by Random Search:", random_search.best_score_)
+
+
+from sklearn.decomposition import LatentDirichletAllocation, NMF
+
+# Convert text data to numeric using TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(max_features=5000)
+X_tfidf = tfidf_vectorizer.fit_transform(data['reviews.text'])
+
+# Latent Dirichlet Allocation (LDA)
+lda_model = LatentDirichletAllocation(n_components=10, random_state=42)
+lda_topics = lda_model.fit_transform(X_tfidf)
+
+# Display the topics
+for index, topic in enumerate(lda_model.components_):
+    print(f"Topic #{index}")
+    print([tfidf_vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-10:]])
+
+# Non-Negative Matrix Factorization (NMF)
+nmf_model = NMF(n_components=10, random_state=42)
+nmf_topics = nmf_model.fit_transform(X_tfidf)
+
+# Display the topics
+for index, topic in enumerate(nmf_model.components_):
+    print(f"Topic #{index}")
+    print([tfidf_vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-10:]])
+
+
+from sklearn.decomposition import LatentDirichletAllocation, NMF
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Convert text data to numeric using TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(max_features=5000)
+X_tfidf = tfidf_vectorizer.fit_transform(data['reviews.text'])
+
+# Latent Dirichlet Allocation (LDA)
+lda_model = LatentDirichletAllocation(n_components=10, max_iter=10, random_state=42, verbose=1)
+lda_topics = lda_model.fit_transform(X_tfidf)
+
+# Display the topics
+for index, topic in enumerate(lda_model.components_):
+    print(f"Topic #{index}")
+    print([tfidf_vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-10:]])
+
+# Non-Negative Matrix Factorization (NMF)
+nmf_model = NMF(n_components=10, max_iter=10, random_state=42, verbose=1)
+nmf_topics = nmf_model.fit_transform(X_tfidf)
+
+# Display the topics
+for index, topic in enumerate(nmf_model.components_):
+    print(f"Topic #{index}")
+    print([tfidf_vectorizer.get_feature_names_out()[i] for i in topic.argsort()[-10:]])
+
